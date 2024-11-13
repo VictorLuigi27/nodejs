@@ -1,5 +1,7 @@
+// ça c'est pour les routes API pour que le front-end les récupères
+
 const express = require('express');
-const Chauffeur = require('./chauffeurs'); // Assurez-vous d'importer le modèle ici
+const Chauffeur = require('./models/chauffeurs');
 
 const app = express();
 
@@ -18,28 +20,27 @@ app.get('/', (req, res) => {
     res.send('Bienvenue sur l\'API des chauffeurs !');
 });
 
-// Route pour créer un chauffeur
+// Pour ajouter un chauffeur
 app.post('/api/driver', (req, res, next) => {
+    console.log(req.body); 
     const chauffeur = new Chauffeur({
-        nom: req.body.nom,
-        prenom: req.body.prenom,
-        email: req.body.email,
-        telephone: req.body.telephone,
-        vehicule: req.body.vehicule,
-        disponibilite: req.body.disponibilite
+      nom: req.body.nom,
+      prenom: req.body.prenom,
+      email: req.body.email,
+      telephone: req.body.telephone,
+      vehicule: req.body.vehicule,
+      disponibilite: req.body.disponibilite,
+      adresse: req.body.adresse,
     });
-
+  
     chauffeur.save()
-        .then(() => res.status(201).json({ message: 'Chauffeur créé' }))
-        .catch(error => res.status(400).json({ error }));
-});
-
-// Route pour récupérer la liste des chauffeurs
-app.get('/api/driver', (req, res, next) => {
-    Chauffeur.find() 
-        .then(drivers => res.status(200).json(drivers))
-        .catch(error => res.status(400).json({ error }));
-});
+      .then(() => res.status(201).json({ message: 'Chauffeur créé' }))
+      .catch(error => {
+        console.error('Erreur lors de l\'ajout du chauffeur:', error);
+        res.status(400).json({ error: error.message || 'Erreur inconnue' });
+      });
+  });
+  
 
 // Route pour mettre à jour un chauffeur
 app.patch('/api/driver/:id', (req, res, next) => {
@@ -85,26 +86,25 @@ app.get('/api/driver/available', (req, res, next) => {
 // Route pour récupérer la liste paginée des chauffeurs
 app.get('/api/driver', (req, res, next) => {
     const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
+    const limit = parseInt(req.query.limit);
 
-    const skip = (page - 1) * limit;
+    const skip = limit > 0 ? (page - 1) * limit : 0; 
 
-    Chauffeur.find()
-        .skip(skip)
-        .limit(limit)
+    const query = Chauffeur.find();
+    if (limit > 0) query.skip(skip).limit(limit); 
+
+    query
         .then(drivers => {
             Chauffeur.countDocuments().then(count => {
                 res.status(200).json({
                     drivers,
                     total: count,
-                    totalPages: Math.ceil(count / limit),
-                    currentPage: page,
+                    totalPages: limit > 0 ? Math.ceil(count / limit) : 1,
+                    currentPage: limit > 0 ? page : 1,
                 });
             });
         })
         .catch(error => res.status(400).json({ error }));
 });
-
-
 // Exporter l'app
 module.exports = app;

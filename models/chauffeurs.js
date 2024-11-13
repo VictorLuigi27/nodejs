@@ -15,7 +15,8 @@ const chauffeur = new mongoose.Schema({
   email: { type: String, required: true, unique: true },
   telephone: { type: String, required: true },
   vehicule: { type: String, required: true },
-  disponibilite: { type: Boolean, required: true }
+  disponibilite: { type: Boolean, required: true },
+  adresse: { type: String, required: true },
 });
 
 // Créer le modèle à partir du schéma
