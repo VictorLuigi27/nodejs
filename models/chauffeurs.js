@@ -17,6 +17,7 @@ const chauffeur = new mongoose.Schema({
   vehicule: { type: String, required: true },
   disponibilite: { type: Boolean, required: true },
   adresse: { type: String, required: true },
+  role: { type: String, required: true, enum: ['chauffeur', 'utilisateur'] }
 });
 
 // Créer le modèle à partir du schéma
