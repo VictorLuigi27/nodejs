@@ -103,22 +103,23 @@ app.get('/api/driver', (req, res, next) => {
 });
 
 // Route pour récupérer le chauffeurs connecté avec son id
-app.get('/api/driver/me', authMiddleware, async (req, res) => {
+app.patch('/api/driver/:id', async (req, res) => {
     try {
-      // Utiliser l'ID du chauffeur extrait du token
-      const chauffeurIdFromToken = req.user.id; // ID extrait du token
-      console.log('ID du chauffeur depuis le token:', chauffeurIdFromToken);
+      const { disponibilite } = req.body; // Extraction de la disponibilité depuis la requête
   
-      // Rechercher le chauffeur dans la base de données avec l'ID extrait du token
-      const chauffeur = await Chauffeur.findById(chauffeurIdFromToken);
-  
+      const chauffeur = await Chauffeur.findById(req.params.id);
       if (!chauffeur) {
         return res.status(404).json({ message: 'Chauffeur non trouvé' });
       }
   
-      return res.status(200).json(chauffeur); // Retourne les informations du chauffeur
+      chauffeur.disponibilite = disponibilite; // Mise à jour de la disponibilité
+  
+      await chauffeur.save(); // Sauvegarder les modifications dans la base de données
+  
+      return res.status(200).json(chauffeur); // Retourner le chauffeur mis à jour
     } catch (error) {
-      return res.status(500).json({ message: 'Erreur interne du serveur' }); // Erreur interne
+      console.error(error);
+      return res.status(500).json({ message: 'Erreur lors de la mise à jour de la disponibilité' });
     }
   });
   
