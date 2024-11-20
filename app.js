@@ -119,7 +119,7 @@ app.get('/api/driver/me', authMiddleware, async (req, res) => { // Ajout de "asy
     }
   });
   
-// --- ROUTES POUR LES CHAUFFEURS (INSCRIPTION ET CONNEXION) ---
+// --- ROUTES POUR LES CHAUFFEURS  (INSCRIPTION ET CONNEXION) ---
 
 // Route d'inscription pour un chauffeur uniquement
 app.post('/api/register', async (req, res) => {
