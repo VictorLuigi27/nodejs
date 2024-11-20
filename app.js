@@ -1,6 +1,6 @@
 const express = require('express');
 const Chauffeur = require('./models/chauffeurs');
-const User = require('./models/user'); // Crée ce modèle si ce n'est pas déjà fait
+const authMiddleware = require('./middleware/authMiddleware.js');    
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 
@@ -102,38 +102,65 @@ app.get('/api/driver', (req, res, next) => {
         .catch(error => res.status(400).json({ error }));
 });
 
-// --- ROUTES POUR LES UTILISATEURS (INSCRIPTION ET CONNEXION) ---
-
-// Route pour l'inscription
-const bcrypt = require('bcrypt');
-
-app.post('/api/register', async (req, res) => {
-    const { nom, prenom, email, password, adresse, vehicule, disponibilite, role } = req.body;
-
-    if (!nom || !prenom || !email || !password || !role) {
-        return res.status(400).json({ message: 'Tous les champs obligatoires ne sont pas remplis.' });
-    }
-
+// Route pour récupérer le chauffeurs connecté avec son id
+app.get('/api/driver/me', authMiddleware, async (req, res) => { // Ajout de "async"
     try {
-        const hashedPassword = await bcrypt.hash(password, 10); // Hashage du mot de passe
-
-        const newUser = new Chauffeur({
-            nom,
-            prenom,
-            email,
-            password: hashedPassword, // Stocker le mot de passe hashé
-            adresse,
-            vehicule: role === 'chauffeur' ? vehicule : undefined,
-            disponibilite: role === 'chauffeur' ? disponibilite : undefined,
-            role
-        });
-
-        await newUser.save();
-        res.status(201).json({ message: `${role} inscrit avec succès.` });
+      // Utiliser l'ID du chauffeur décodé depuis le token
+      const chauffeurId = req.user.id; // ID du chauffeur dans le token
+      const chauffeur = await Chauffeur.findById(chauffeurId); // Attente du résultat de la recherche
+      
+      if (!chauffeur) {
+        return res.status(404).json({ message: 'Chauffeur non trouvé' });
+      }
+      
+      return res.status(200).json(chauffeur); // Réponse avec les données du chauffeur
     } catch (error) {
-        res.status(400).json({ error: error.message || 'Erreur inconnue' });
+      return res.status(500).json({ message: 'Erreur interne du serveur' }); // Erreur interne
     }
-});
+  });
+  
+// --- ROUTES POUR LES CHAUFFEURS (INSCRIPTION ET CONNEXION) ---
+
+// Route d'inscription pour un chauffeur uniquement
+app.post('/api/register', async (req, res) => {
+    const { nom, prenom, email, password, telephone, adresse, vehicule, disponibilite } = req.body;
+
+    console.log("Données reçues :", req.body);
+  
+    if (!nom || !prenom || !email || !password || !adresse || !telephone || !vehicule || disponibilite === undefined) {
+      return res.status(400).json({ message: 'Tous les champs sont obligatoires.' });
+    }
+  
+    try {
+      // Vérifier si l'email existe déjà
+      const existingChauffeur = await Chauffeur.findOne({ email });
+      if (existingChauffeur) {
+        return res.status(400).json({ message: 'Cet email est déjà utilisé.' });
+      }
+  
+      // Hachage du mot de passe
+      const hashedPassword = await bcrypt.hash(password, 10);
+  
+      const newChauffeur = new Chauffeur({
+        nom,
+        prenom,
+        email,
+        password: hashedPassword,
+        telephone,
+        adresse,
+        vehicule,
+        disponibilite,
+      });
+  
+      await newChauffeur.save();
+      res.status(201).json({ message: 'Chauffeur inscrit avec succès.' });
+      console.log("Données reçues:", req.body);
+    } catch (error) {
+      console.error("Erreur d'inscription:", error);
+      res.status(500).json({ error: error.message || 'Erreur inconnue lors de l\'inscription.' });
+    }
+  });
+  
 
 // Route pour la connexion
 app.post('/api/login', async (req, res) => {
@@ -154,12 +181,31 @@ app.post('/api/login', async (req, res) => {
             return res.status(401).json({ message: 'Mot de passe incorrect.' });
         }
 
-        const token = "faketoken123"; // Remplacez par un vrai JWT
-        res.status(200).json({ token, role: user.role, message: 'Connexion réussie.' });
+        // Créer un token JWT
+        const token = jwt.sign(
+            { id: user._id, email: user.email, role: user.role }, // Payload du token
+            process.env.JWT_SECRET || 'votre_clé_secrète',  // Clé secrète pour signer le token
+            { expiresIn: '1h' } // Expiration du token (1h dans cet exemple)
+        );
+
+        // Renvoyer le token et d'autres infos si nécessaire
+        res.status(200).json({
+            token,
+            driver: { // Changer 'chauffeur' en 'driver'
+                _id: user._id,
+                nom: user.nom,
+                prenom: user.prenom,
+                email: user.email,
+                telephone: user.telephone,
+                disponibilite: user.disponibilite
+              },
+            message: 'Connexion réussie.'
+        });
     } catch (error) {
         res.status(500).json({ error: error.message || 'Erreur inconnue' });
     }
 });
+
 
 // Exporter l'app
 module.exports = app;
