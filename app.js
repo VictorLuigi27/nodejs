@@ -1,6 +1,8 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const Chauffeur = require('./models/chauffeurs');
-const authMiddleware = require('./middleware/authMiddleware.js');    
+const Course = require('./models/courses');
+const authMiddleware = require('./middleware/authMiddleware');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
@@ -217,6 +219,93 @@ app.post('/api/login', async (req, res) => {
         res.status(500).json({ error: error.message || 'Erreur inconnue' });
     }
 });
+
+// --- ROUTE POUR LES COURSES DES CHAUFFEURS ---
+
+// 1) ROUTE POUR AJOUTER UNE COURSE (CHAUFFEUR) OK
+
+app.post('/api/driver/course', async (req, res) => {
+    const { destination, montant, chauffeurId } = req.body;
+
+    // Vérifiez les champs requis
+    if (!destination || !montant || !chauffeurId) {
+        return res.status(400).json({ message: 'Tous les champs (destination, montant, chauffeurId) sont requis.' });
+    }
+
+    // Vérifiez que chauffeurId est un ObjectId valide
+    if (!mongoose.Types.ObjectId.isValid(chauffeurId)) {
+        return res.status(400).json({ message: 'chauffeurId invalide.' });
+    }
+
+    try {
+        const newCourse = new Course({
+            destination,
+            montant,
+            chauffeur: new mongoose.Types.ObjectId(chauffeurId.toString()),
+        });
+
+        await newCourse.save();
+        res.status(201).json({ message: 'Course ajoutée avec succès', course: newCourse });
+    } catch (error) {
+        console.error('Erreur lors de l\'ajout de la course:', error);
+        res.status(500).json({ message: 'Erreur inconnue lors de l\'ajout de la course.' });
+    }
+});
+
+
+// Route pour récuperer les courses d'un chauffeur
+app.get('/api/driver/courses', authMiddleware, async (req, res) => {
+    const chauffeurId = req.user.id;  // Utiliser req.user pour obtenir l'ID du chauffeur
+  
+    console.log("ID du chauffeur:", chauffeurId);  // Log pour vérifier
+  
+    if (!chauffeurId) {
+      return res.status(400).json({ message: 'ID du chauffeur manquant.' });
+    }
+  
+    try {
+      const courses = await Course.find({ chauffeur: chauffeurId });
+  
+      if (courses.length === 0) {
+        return res.status(404).json({ message: 'Aucune course trouvée pour ce chauffeur.' });
+      }
+  
+      res.status(200).json(courses);
+    } catch (error) {
+      console.error('Erreur lors de la récupération des courses:', error);
+      res.status(500).json({ message: 'Erreur inconnue lors de la récupération des courses.' });
+    }
+  });
+  
+
+// Route pour récupérer toutes les courses (plus tard)
+// app.get('/api/courses', async (req, res) => {
+//     try {
+//         const courses = await Course.find().populate('chauffeur', 'nom prenom email'); 
+//         res.status(200).json(courses);
+//     } catch (error) {
+//         console.error('Erreur lors de la récupération des courses:', error);
+//         res.status(500).json({ error: error.message || 'Erreur inconnue lors de la récupération des courses.' });
+//     }
+// });
+
+// Route pour récupérer les courses avec un statut spécifique (plus tard)
+// app.get('/api/courses/status', async (req, res) => {
+//     const { statut } = req.query;
+
+//     if (!statut) {
+//         return res.status(400).json({ message: 'Le paramètre de statut est requis.' });
+//     }
+
+//     try {
+//         // Trouver les courses selon le statut
+//         const courses = await Course.find({ statut }).populate('chauffeur', 'nom prenom email');
+//         res.status(200).json(courses);
+//     } catch (error) {
+//         console.error('Erreur lors de la récupération des courses par statut:', error);
+//         res.status(500).json({ error: error.message || 'Erreur inconnue lors de la récupération des courses par statut.' });
+//     }
+// });
 
 
 // Exporter l'app
