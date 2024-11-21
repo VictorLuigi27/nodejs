@@ -3,11 +3,19 @@ const Chauffeur = require('./models/chauffeurs');
 const authMiddleware = require('./middleware/authMiddleware.js');    
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const cors = require('cors');
 
 const app = express();
 
+
 // Middleware pour gérer les erreurs CORS
 app.use(express.json());
+
+app.use(cors({
+    origin: 'http://localhost:5173', 
+    methods: ['GET', 'POST', 'PATCH', 'DELETE'], 
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  }));
 
 app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -103,27 +111,26 @@ app.get('/api/driver', (req, res, next) => {
 });
 
 // Route pour récupérer le chauffeurs connecté avec son id
-app.patch('/api/driver/:id', async (req, res) => {
+app.get('/api/driver/me', authMiddleware, async (req, res) => {
     try {
-      const { disponibilite } = req.body; // Extraction de la disponibilité depuis la requête
+      const chauffeurIdFromToken = req.user.id; // ID extrait du token
+      console.log('ID du chauffeur depuis le token:', chauffeurIdFromToken);
   
-      const chauffeur = await Chauffeur.findById(req.params.id);
+      // Rechercher le chauffeur dans la base de données
+      const chauffeur = await Chauffeur.findById(chauffeurIdFromToken);
+  
       if (!chauffeur) {
         return res.status(404).json({ message: 'Chauffeur non trouvé' });
       }
   
-      chauffeur.disponibilite = disponibilite; // Mise à jour de la disponibilité
-  
-      await chauffeur.save(); // Sauvegarder les modifications dans la base de données
-  
-      return res.status(200).json(chauffeur); // Retourner le chauffeur mis à jour
+      return res.status(200).json(chauffeur); // Retourner les informations du chauffeur
     } catch (error) {
-      console.error(error);
-      return res.status(500).json({ message: 'Erreur lors de la mise à jour de la disponibilité' });
+      console.error('Erreur interne:', error);
+      return res.status(500).json({ message: 'Erreur interne du serveur' });
     }
   });
   
-  
+
 // --- ROUTES POUR LES CHAUFFEURS  (INSCRIPTION ET CONNEXION) ---
 
 // Route d'inscription pour un chauffeur uniquement
