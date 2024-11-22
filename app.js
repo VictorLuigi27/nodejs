@@ -281,30 +281,45 @@ app.get('/api/driver/courses', authMiddleware, async (req, res) => {
 });
 
 // Route DELETE pour supprimer une course
-app.delete('/api/courses/:id', verifyToken, (req, res) => {
-    const courseId = req.params.id;
-  
-    // Vérification que l'ID de la course est valide
-    if (!courseId) {
-      return res.status(400).json({ message: 'ID de course manquant' });
+app.delete('/api/driver/courses/:id', verifyToken, async (req, res) => {
+  const courseId = req.params.id;
+  const chauffeurId = req.user.id;
+
+  console.log('ID de la course à supprimer:', courseId);
+
+  // Vérification que l'ID de la course est valide
+  if (!courseId) {
+    return res.status(400).json({ message: 'ID de course manquant' });
+  }
+
+  try {
+    // Trouver le chauffeur
+    const chauffeur = await Chauffeur.findById(chauffeurId);
+
+    if (!chauffeur) {
+      return res.status(404).json({ message: 'Chauffeur non trouvé' });
     }
-  
-    // Tente de supprimer la course avec l'ID spécifié
-    Course.findByIdAndDelete(courseId)
-      .then((course) => {
-        // Si aucune course n'est trouvée, retour d'une erreur
-        if (!course) {
-          return res.status(404).json({ message: 'Course non trouvée' });
-        }
-  
-        // Si la course est supprimée avec succès
-        res.status(200).json({ message: 'Course supprimée' });
-      })
-      .catch((err) => {
-        console.error(err);  // Pour logguer l'erreur côté serveur
-        res.status(500).json({ message: 'Erreur lors de la suppression de la course', error: err.message });
-      });
-  });
+
+    // Trouver et supprimer la course dans le tableau `courses` du chauffeur
+    const courseIndex = chauffeur.courses.findIndex(course => course._id.toString() === courseId);
+
+    if (courseIndex === -1) {
+      return res.status(404).json({ message: 'Course non trouvée' });
+    }
+
+    // Supprimer la course
+    chauffeur.courses.splice(courseIndex, 1);
+
+    // Sauvegarder les modifications
+    await chauffeur.save();
+
+    res.status(200).json({ message: 'Course supprimée' });
+  } catch (err) {
+    console.error(err);  // Pour logguer l'erreur côté serveur
+    res.status(500).json({ message: 'Erreur lors de la suppression de la course', error: err.message });
+  }
+});
+
   
 
 // Route pour récupérer toutes les courses (plus tard)
