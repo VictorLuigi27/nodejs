@@ -1,11 +1,12 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const Chauffeur = require('./models/chauffeurs');
-const Course = require('./models/courses');
+// const Course = require('./models/courses');
 const authMiddleware = require('./middleware/authMiddleware');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
+const verifyToken = require('./middleware/verifyToken');
 
 const app = express();
 
@@ -225,56 +226,84 @@ app.post('/api/login', async (req, res) => {
 // 1) ROUTE POUR AJOUTER UNE COURSE (CHAUFFEUR) OK
 
 app.post('/api/driver/course', async (req, res) => {
-    const { destination, montant, chauffeurId } = req.body;
+  const { chauffeurId, montant, destination } = req.body;
 
-    // Vérifiez les champs requis
-    if (!destination || !montant || !chauffeurId) {
-        return res.status(400).json({ message: 'Tous les champs (destination, montant, chauffeurId) sont requis.' });
+  try {
+    // Vérifier si le chauffeur existe
+    const chauffeur = await Chauffeur.findById(chauffeurId);
+    if (!chauffeur) {
+      return res.status(404).json({ message: 'Chauffeur non trouvé' });
     }
 
-    // Vérifiez que chauffeurId est un ObjectId valide
-    if (!mongoose.Types.ObjectId.isValid(chauffeurId)) {
-        return res.status(400).json({ message: 'chauffeurId invalide.' });
-    }
+    // Ajouter une nouvelle course au tableau courses du chauffeur
+    chauffeur.courses.push({
+      montant,
+      destination
+    });
 
-    try {
-        const newCourse = new Course({
-            destination,
-            montant,
-            chauffeur: new mongoose.Types.ObjectId(chauffeurId.toString()),
-        });
+    // Sauvegarder le chauffeur avec la nouvelle course ajoutée
+    await chauffeur.save();
 
-        await newCourse.save();
-        res.status(201).json({ message: 'Course ajoutée avec succès', course: newCourse });
-    } catch (error) {
-        console.error('Erreur lors de l\'ajout de la course:', error);
-        res.status(500).json({ message: 'Erreur inconnue lors de l\'ajout de la course.' });
-    }
+    res.status(201).json({ message: 'Course ajoutée avec succès', chauffeur });
+  } catch (error) {
+    console.error('Erreur lors de l\'ajout de la course:', error);
+    res.status(500).json({ message: 'Erreur lors de l\'ajout de la course' });
+  }
 });
-
 
 // Route pour récuperer les courses d'un chauffeur
 app.get('/api/driver/courses', authMiddleware, async (req, res) => {
-    const chauffeurId = req.user.id;  // Utiliser req.user pour obtenir l'ID du chauffeur
+  const chauffeurId = req.user.id; // ID du chauffeur obtenu via le token
+  console.log('ID du chauffeur récupéré depuis le token:', chauffeurId);
+
+  try {
+    // Vérifier si le chauffeur existe
+    const chauffeur = await Chauffeur.findById(chauffeurId);
+    if (!chauffeur) {
+      return res.status(404).json({ message: 'Chauffeur non trouvé' });
+    }
+
+    // Récupérer les courses du chauffeur
+    const courses = chauffeur.courses;
+
+    // Log des courses récupérées
+    console.log('Courses trouvées:', courses);
+
+    if (!courses || courses.length === 0) {
+      return res.status(404).json({ message: 'Aucune course trouvée pour ce chauffeur.' });
+    }
+
+    res.status(200).json(courses);
+  } catch (error) {
+    console.error('Erreur lors de la récupération des courses:', error);
+    res.status(500).json({ message: 'Erreur lors de la récupération des courses.' });
+  }
+});
+
+// Route DELETE pour supprimer une course
+app.delete('/api/courses/:id', verifyToken, (req, res) => {
+    const courseId = req.params.id;
   
-    console.log("ID du chauffeur:", chauffeurId);  // Log pour vérifier
-  
-    if (!chauffeurId) {
-      return res.status(400).json({ message: 'ID du chauffeur manquant.' });
+    // Vérification que l'ID de la course est valide
+    if (!courseId) {
+      return res.status(400).json({ message: 'ID de course manquant' });
     }
   
-    try {
-      const courses = await Course.find({ chauffeur: chauffeurId });
+    // Tente de supprimer la course avec l'ID spécifié
+    Course.findByIdAndDelete(courseId)
+      .then((course) => {
+        // Si aucune course n'est trouvée, retour d'une erreur
+        if (!course) {
+          return res.status(404).json({ message: 'Course non trouvée' });
+        }
   
-      if (courses.length === 0) {
-        return res.status(404).json({ message: 'Aucune course trouvée pour ce chauffeur.' });
-      }
-  
-      res.status(200).json(courses);
-    } catch (error) {
-      console.error('Erreur lors de la récupération des courses:', error);
-      res.status(500).json({ message: 'Erreur inconnue lors de la récupération des courses.' });
-    }
+        // Si la course est supprimée avec succès
+        res.status(200).json({ message: 'Course supprimée' });
+      })
+      .catch((err) => {
+        console.error(err);  // Pour logguer l'erreur côté serveur
+        res.status(500).json({ message: 'Erreur lors de la suppression de la course', error: err.message });
+      });
   });
   
 

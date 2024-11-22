@@ -18,6 +18,13 @@ const chauffeur = new mongoose.Schema({
   password: { type: String, required: true },
   vehicule: { type: String, required: true },
   disponibilite: { type: Boolean, required: true },
+  courses: [
+    {
+      montant: { type: Number, required: true },
+      destination: { type: String, required: true },
+      date: { type: Date, default: Date.now }
+    }
+  ]
 });
 
 // Créer le modèle à partir du schéma
